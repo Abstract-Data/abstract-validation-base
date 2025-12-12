@@ -674,9 +674,7 @@ class TestRichDashboardObserverProperties:
         ),
     )
     @settings(max_examples=50)
-    def test_error_counts_match_occurrences(
-        self, error_events: list[tuple[str, str]]
-    ) -> None:
+    def test_error_counts_match_occurrences(self, error_events: list[tuple[str, str]]) -> None:
         """Test that error counts accurately reflect the number of occurrences."""
         observer = RichDashboardObserver()
 
@@ -700,19 +698,19 @@ class TestRichDashboardObserverProperties:
 
     @given(
         stats_list=st.lists(
-            st.fixed_dictionaries({
-                "total": st.integers(min_value=0, max_value=10000),
-                "valid": st.integers(min_value=0, max_value=10000),
-                "failed": st.integers(min_value=0, max_value=10000),
-            }),
+            st.fixed_dictionaries(
+                {
+                    "total": st.integers(min_value=0, max_value=10000),
+                    "valid": st.integers(min_value=0, max_value=10000),
+                    "failed": st.integers(min_value=0, max_value=10000),
+                }
+            ),
             min_size=1,
             max_size=20,
         ),
     )
     @settings(max_examples=30)
-    def test_stats_snapshot_matches_last_event(
-        self, stats_list: list[dict[str, int]]
-    ) -> None:
+    def test_stats_snapshot_matches_last_event(self, stats_list: list[dict[str, int]]) -> None:
         """Test that stats_snapshot always matches the last ROW_PROCESSED event."""
         observer = RichDashboardObserver()
 

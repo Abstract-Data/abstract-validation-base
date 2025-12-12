@@ -415,9 +415,7 @@ class TestCompositeValidatorProperties:
     @settings(max_examples=50)
     def test_validator_names_match(self, names: list[str]) -> None:
         """validator_names matches actual validator.name values."""
-        validators: list[BaseValidator[SampleModel]] = [
-            SimpleValidator(name) for name in names
-        ]
+        validators: list[BaseValidator[SampleModel]] = [SimpleValidator(name) for name in names]
         composite = CompositeValidator[SampleModel](validators=validators)
 
         assert composite.validator_names == names

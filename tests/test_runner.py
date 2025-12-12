@@ -981,22 +981,19 @@ class TestValidationRunnerParallel:
 
         # Should have VALIDATION_STARTED
         started_events = [
-            e for e in observer.events
-            if e.event_type == ValidationEventType.VALIDATION_STARTED
+            e for e in observer.events if e.event_type == ValidationEventType.VALIDATION_STARTED
         ]
         assert len(started_events) == 1
 
         # Should have VALIDATION_COMPLETED
         completed_events = [
-            e for e in observer.events
-            if e.event_type == ValidationEventType.VALIDATION_COMPLETED
+            e for e in observer.events if e.event_type == ValidationEventType.VALIDATION_COMPLETED
         ]
         assert len(completed_events) == 1
 
         # Should have ROW_PROCESSED for each row
         row_events = [
-            e for e in observer.events
-            if e.event_type == ValidationEventType.ROW_PROCESSED
+            e for e in observer.events if e.event_type == ValidationEventType.ROW_PROCESSED
         ]
         assert len(row_events) == 10
 
@@ -1010,8 +1007,7 @@ class TestValidationRunnerParallel:
         list(runner.run(workers=4, chunk_size=5))
 
         started_events = [
-            e for e in observer.events
-            if e.event_type == ValidationEventType.VALIDATION_STARTED
+            e for e in observer.events if e.event_type == ValidationEventType.VALIDATION_STARTED
         ]
         assert len(started_events) == 1
         assert started_events[0].data.get("workers") == 4
@@ -1062,8 +1058,7 @@ class TestValidationRunnerParallel:
 
         # In sequential mode, no worker info in started event
         started_events = [
-            e for e in observer.events
-            if e.event_type == ValidationEventType.VALIDATION_STARTED
+            e for e in observer.events if e.event_type == ValidationEventType.VALIDATION_STARTED
         ]
         assert "workers" not in started_events[0].data
 
@@ -1236,14 +1231,18 @@ class TestRunnerStatsProperties:
         assert total_from_top == len(errors)
 
     @given(
-        stats1_data=st.fixed_dictionaries({
-            "total": st.integers(min_value=0, max_value=1000),
-            "valid": st.integers(min_value=0, max_value=1000),
-        }),
-        stats2_data=st.fixed_dictionaries({
-            "total": st.integers(min_value=0, max_value=1000),
-            "valid": st.integers(min_value=0, max_value=1000),
-        }),
+        stats1_data=st.fixed_dictionaries(
+            {
+                "total": st.integers(min_value=0, max_value=1000),
+                "valid": st.integers(min_value=0, max_value=1000),
+            }
+        ),
+        stats2_data=st.fixed_dictionaries(
+            {
+                "total": st.integers(min_value=0, max_value=1000),
+                "valid": st.integers(min_value=0, max_value=1000),
+            }
+        ),
     )
     @settings(max_examples=50)
     def test_merge_is_additive(

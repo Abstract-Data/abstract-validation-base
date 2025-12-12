@@ -6,11 +6,18 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: write
+
 jobs:
   check-version-sync:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -21,24 +28,82 @@ jobs:
         run: uv python install 3.12
 
       - name: Check version sync
+        id: check
         run: |
-          # Get version from pyproject.toml using uv (extract just the version number)
+          # Get version from pyproject.toml
           PYPROJECT_VERSION=$(uv version | awk '{print $2}')
           echo "pyproject.toml version: $PYPROJECT_VERSION"
           
-          # Get version from __init__.py
-          INIT_VERSION=$(grep -oP '__version__ = "\K[^"]+' src/abstract_validation_base/__init__.py)
+          # Get version from __init__.py (using sed for portability)
+          INIT_VERSION=$(grep '__version__' src/abstract_validation_base/__init__.py | sed 's/.*"\(.*\)".*/\1/')
           echo "__init__.py version: $INIT_VERSION"
           
           # Compare versions
           if [ "$PYPROJECT_VERSION" != "$INIT_VERSION" ]; then
             echo "❌ Version mismatch!"
-            echo "   pyproject.toml: $PYPROJECT_VERSION"
-            echo "   __init__.py: $INIT_VERSION"
-            echo ""
-            echo "Run the Release workflow to bump versions consistently."
             exit 1
           fi
           
           echo "✅ Versions are in sync: $PYPROJECT_VERSION"
+          echo "version=$PYPROJECT_VERSION" >> $GITHUB_OUTPUT
 
+  create-tag-if-missing:
+    needs: check-version-sync
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Debug version
+        run: |
+          echo "Version: '${{ needs.check-version-sync.outputs.version }}'"
+
+      - name: Create tag if missing
+        id: tag
+        run: |
+          VERSION="${{ needs.check-version-sync.outputs.version }}"
+          echo "VERSION: '$VERSION'"
+          
+          if [ -z "$VERSION" ]; then
+            echo "ERROR: VERSION is empty!"
+            exit 1
+          fi
+          
+          TAG_NAME="v$VERSION"
+          echo "Checking for tag: $TAG_NAME"
+          echo "Existing tags:"
+          git tag -l
+          
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME exists locally"
+            echo "created=false" >> $GITHUB_OUTPUT
+          elif git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+            echo "Tag $TAG_NAME exists on remote"
+            echo "created=false" >> $GITHUB_OUTPUT
+          else
+            echo "Creating tag $TAG_NAME..."
+            git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+            git push origin "$TAG_NAME"
+            echo "Created tag $TAG_NAME"
+            echo "created=true" >> $GITHUB_OUTPUT
+          fi
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.tag.outputs.created == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: Release ${{ steps.tag.outputs.tag_name }}
+          generate_release_notes: true
+          prerelease: ${{ contains(needs.check-version-sync.outputs.version, 'a') || contains(needs.check-version-sync.outputs.version, 'b') || contains(needs.check-version-sync.outputs.version, 'rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

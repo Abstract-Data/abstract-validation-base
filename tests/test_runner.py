@@ -38,7 +38,7 @@ class TestRowResult:
 
     def test_row_result_invalid_with_pydantic_errors(self) -> None:
         """Test RowResult is invalid when it has Pydantic errors."""
-        result = RowResult(
+        result: RowResult[SampleModel] = RowResult(
             row_index=1,
             raw_data={"name": 123},
             pydantic_errors=[
@@ -73,7 +73,7 @@ class TestRowResult:
         validator_result = ValidationResult(is_valid=False)
         validator_result.add_error("custom_field", "Custom error")
 
-        result = RowResult(
+        result: RowResult[SampleModel] = RowResult(
             row_index=3,
             raw_data={"name": "test"},
             pydantic_errors=[
@@ -87,7 +87,7 @@ class TestRowResult:
 
     def test_error_summary_handles_missing_loc(self) -> None:
         """Test error_summary handles Pydantic errors without loc field."""
-        result = RowResult(
+        result: RowResult[SampleModel] = RowResult(
             row_index=0,
             raw_data={},
             pydantic_errors=[{"msg": "General error"}],
@@ -99,7 +99,7 @@ class TestRowResult:
 
     def test_error_summary_uses_type_when_msg_missing(self) -> None:
         """Test error_summary falls back to type when msg is missing."""
-        result = RowResult(
+        result: RowResult[SampleModel] = RowResult(
             row_index=0,
             raw_data={},
             pydantic_errors=[{"type": "value_error", "loc": ("field",)}],
@@ -439,7 +439,7 @@ class TestValidationRunnerBasic:
 
     def test_runner_fail_fast(self) -> None:
         """Test runner stops on first error when fail_fast=True."""
-        data = [
+        data: list[dict[str, Any]] = [
             {"name": "valid1"},
             {"name": 123},  # Invalid
             {"name": "valid2"},
@@ -459,7 +459,7 @@ class TestValidationRunnerBasic:
 
     def test_runner_run_collect_valid(self) -> None:
         """Test run_collect_valid yields only valid models."""
-        data = [
+        data: list[dict[str, Any]] = [
             {"name": "valid1", "value": 1},
             {"name": 123},  # Invalid
             {"name": "valid2", "value": 2},
@@ -475,7 +475,7 @@ class TestValidationRunnerBasic:
 
     def test_runner_run_collect_failed(self) -> None:
         """Test run_collect_failed yields only failed results."""
-        data = [
+        data: list[dict[str, Any]] = [
             {"name": "valid"},
             {"name": 123},  # Invalid
             {"name": "another_valid"},
@@ -516,7 +516,7 @@ class TestValidationRunnerBatching:
 
     def test_run_batch_valid_with_invalid_rows(self) -> None:
         """Test batching excludes invalid rows."""
-        data = [
+        data: list[dict[str, Any]] = [
             {"name": "valid1"},
             {"name": 123},  # Invalid
             {"name": "valid2"},
@@ -590,7 +590,7 @@ class TestValidationRunnerEvents:
 
     def test_emits_row_processed_events(self) -> None:
         """Test that ROW_PROCESSED events are emitted for each row."""
-        data = [{"name": "valid"}, {"name": 123}]
+        data: list[dict[str, Any]] = [{"name": "valid"}, {"name": 123}]
         runner = ValidationRunner(make_data_iterator(data), SampleModel)
         observer = RecordingObserver()
         runner.add_observer(observer)
@@ -646,7 +646,7 @@ class TestValidationRunnerAuditReport:
 
     def test_audit_report_summary(self) -> None:
         """Test audit_report summary contains correct metrics."""
-        data = [
+        data: list[dict[str, Any]] = [
             {"name": "valid1"},
             {"name": 123},  # Invalid
             {"name": "valid2"},

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -187,7 +188,7 @@ class TestProcessEntryProperties:
     ) -> None:
         """Any valid field/message combination creates a valid entry."""
         entry = ProcessEntry(
-            entry_type=entry_type,  # type: ignore[arg-type]
+            entry_type=entry_type,
             field=field,
             message=message,
         )
@@ -207,7 +208,7 @@ class TestProcessEntryProperties:
     ) -> None:
         """Timestamp is always valid ISO format."""
         entry = ProcessEntry(
-            entry_type=entry_type,  # type: ignore[arg-type]
+            entry_type=entry_type,
             field=field,
             message=message,
         )
@@ -232,11 +233,11 @@ class TestProcessEntryProperties:
         message: str,
         original_value: str | None,
         new_value: str | None,
-        context: dict,
+        context: dict[str, Any],
     ) -> None:
         """Entry can be created with any combination of valid fields and serialized."""
         entry = ProcessEntry(
-            entry_type=entry_type,  # type: ignore[arg-type]
+            entry_type=entry_type,
             field=field,
             message=message,
             original_value=original_value,
@@ -275,13 +276,13 @@ class TestProcessLogProperties:
         )
     )
     @settings(max_examples=50)
-    def test_process_log_entry_preservation(self, entries: list[dict]) -> None:
+    def test_process_log_entry_preservation(self, entries: list[dict[str, str]]) -> None:
         """Entries added are retrievable unchanged."""
         log = ProcessLog()
 
         for entry_data in entries:
             entry = ProcessEntry(
-                entry_type=entry_data["entry_type"],  # type: ignore[arg-type]
+                entry_type=entry_data["entry_type"],
                 field=entry_data["field"],
                 message=entry_data["message"],
             )

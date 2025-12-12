@@ -76,7 +76,7 @@ class TestValidatedRecord:
 
         db_model = ConfigRecord.db_model()
         instance = db_model(key="test", value="custom")
-        assert instance.enabled is True
+        assert instance.enabled is True  # type: ignore[attr-defined]
 
     def test_to_db_converts_instance(self) -> None:
         """to_db() converts validation model to DB model instance."""
@@ -89,9 +89,9 @@ class TestValidatedRecord:
         db_customer = customer.to_db()
 
         assert isinstance(db_customer, SQLModel)
-        assert db_customer.email == "test@example.com"
-        assert db_customer.name == "Test User"
-        assert db_customer.id is None
+        assert db_customer.email == "test@example.com"  # type: ignore[attr-defined]
+        assert db_customer.name == "Test User"  # type: ignore[attr-defined]
+        assert db_customer.id is None  # type: ignore[attr-defined]
 
     def test_to_db_with_overrides(self) -> None:
         """to_db() accepts field overrides."""
@@ -102,8 +102,8 @@ class TestValidatedRecord:
         record = RecordWithOverrides(value="original")
         db_record = record.to_db(id=123, value="overridden")
 
-        assert db_record.id == 123
-        assert db_record.value == "overridden"
+        assert db_record.id == 123  # type: ignore[attr-defined]
+        assert db_record.value == "overridden"  # type: ignore[attr-defined]
 
     def test_db_model_class_method(self) -> None:
         """db_model() returns the generated SQLModel class."""
@@ -194,5 +194,5 @@ class TestValidatedRecord:
         record = OptionalRecord(required_field="test")
         db_record = record.to_db()
 
-        assert db_record.required_field == "test"
-        assert db_record.optional_field is None
+        assert db_record.required_field == "test"  # type: ignore[attr-defined]
+        assert db_record.optional_field is None  # type: ignore[attr-defined]

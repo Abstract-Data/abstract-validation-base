@@ -395,7 +395,9 @@ class TestCompositeValidatorProperties:
     @settings(max_examples=50)
     def test_composite_validator_count(self, count: int) -> None:
         """len(composite) == len(validators list)."""
-        validators = [SimpleValidator(f"v{i}") for i in range(count)]
+        validators: list[BaseValidator[SampleModel]] = [
+            SimpleValidator(f"v{i}") for i in range(count)
+        ]
         composite = CompositeValidator[SampleModel](validators=validators)
 
         assert len(composite) == count
@@ -413,7 +415,9 @@ class TestCompositeValidatorProperties:
     @settings(max_examples=50)
     def test_validator_names_match(self, names: list[str]) -> None:
         """validator_names matches actual validator.name values."""
-        validators = [SimpleValidator(name) for name in names]
+        validators: list[BaseValidator[SampleModel]] = [
+            SimpleValidator(name) for name in names
+        ]
         composite = CompositeValidator[SampleModel](validators=validators)
 
         assert composite.validator_names == names

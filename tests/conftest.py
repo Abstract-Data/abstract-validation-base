@@ -31,7 +31,13 @@ optional_strings = st.one_of(st.none(), st.text(max_size=100))
 
 # Strategy for context dicts
 context_dicts = st.dictionaries(
-    keys=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L",))),
+    keys=st.text(
+        min_size=1,
+        max_size=20,
+        alphabet=st.characters(
+            whitelist_categories=("L",)  # type: ignore[arg-type]
+        ),
+    ),
     values=st.one_of(st.integers(), st.text(max_size=50), st.booleans()),
     max_size=5,
 )

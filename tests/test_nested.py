@@ -85,6 +85,7 @@ class TestAuditLogRecursive:
         address = Address(street="123 Main", city="NYC")
         person = Person(name="John", address=address)
 
+        assert person.address is not None
         person.address.add_error("city", "Invalid city")
 
         log = person.audit_log_recursive()
@@ -98,6 +99,7 @@ class TestAuditLogRecursive:
         address = Address(street="123 Main", city="NYC")
         person = Person(name="John", address=address)
 
+        assert person.address is not None
         person.address.add_cleaning_process("city", "nyc", "NYC", "Uppercased")
 
         log = person.audit_log_recursive()
@@ -112,6 +114,7 @@ class TestAuditLogRecursive:
         person = Person(name="John", address=address)
 
         person.add_error("name", "Name too short")
+        assert person.address is not None
         person.address.add_error("city", "Invalid city")
 
         log = person.audit_log_recursive()
@@ -129,6 +132,7 @@ class TestAuditLogRecursive:
         person = Person(name="John", address=address)
 
         person.add_error("name", "Error")
+        assert person.address is not None
         person.address.add_error("city", "Error")
 
         log = person.audit_log_recursive(source="batch_1")
@@ -146,6 +150,8 @@ class TestAuditLogRecursive:
         contact = Contact(email="john@example.com")
         person = Person(name="John", address=address, contact=contact)
 
+        assert person.address is not None
+        assert person.contact is not None
         person.address.add_error("street", "Invalid street")
         person.contact.add_error("email", "Invalid email")
 
@@ -194,6 +200,7 @@ class TestAuditLogRecursive:
 
         company.address.add_error("city", "Company city error")
         company.employees[0].add_error("name", "Employee name error")
+        assert company.employees[0].address is not None
         company.employees[0].address.add_error("street", "Employee address error")
 
         log = company.audit_log_recursive(source="company_import")
@@ -214,6 +221,7 @@ class TestAuditLogRecursive:
         # Add entries with small delays
         person.add_error("name", "First")
         time.sleep(0.01)
+        assert person.address is not None
         person.address.add_error("city", "Second")
         time.sleep(0.01)
         person.add_error("age", "Third")
@@ -263,6 +271,7 @@ class TestAuditLogRecursiveProperties:
         for i in range(parent_errors):
             person.add_error(f"field_{i}", f"error_{i}")
 
+        assert person.address is not None
         for i in range(child_errors):
             person.address.add_error(f"child_field_{i}", f"child_error_{i}")
 

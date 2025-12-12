@@ -108,6 +108,23 @@ class TestRowResult:
         errors = result.error_summary
         assert errors[0][1] == "value_error"
 
+    def test_error_summary_handles_empty_loc_tuple(self) -> None:
+        """Test error_summary handles Pydantic errors with empty loc tuple.
+        
+        This can occur with model_validator failures on nested models where
+        Pydantic may return an empty location tuple.
+        """
+        result: RowResult[SampleModel] = RowResult(
+            row_index=0,
+            raw_data={},
+            pydantic_errors=[{"type": "value_error", "loc": (), "msg": "Model validation failed"}],
+        )
+
+        errors = result.error_summary
+        assert len(errors) == 1
+        assert errors[0][0] == "unknown"  # Default when loc is empty
+        assert errors[0][1] == "Model validation failed"
+
 
 # =============================================================================
 # RunnerStats Unit Tests

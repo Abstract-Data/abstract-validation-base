@@ -77,7 +77,8 @@ class RowResult(Generic[T]):
         """
         errors: list[tuple[str, str]] = []
         for pydantic_err in self.pydantic_errors:
-            field_name = str(pydantic_err.get("loc", ["unknown"])[-1])
+            loc = pydantic_err.get("loc", ())
+            field_name = str(loc[-1]) if loc else "unknown"
             msg = pydantic_err.get("msg", pydantic_err.get("type", "validation_error"))
             errors.append((field_name, msg))
         if self.validator_result:

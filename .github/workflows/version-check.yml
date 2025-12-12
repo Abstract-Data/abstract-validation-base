@@ -1,0 +1,44 @@
+name: Version Check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  check-version-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Check version sync
+        run: |
+          # Get version from pyproject.toml using uv
+          PYPROJECT_VERSION=$(uv version)
+          echo "pyproject.toml version: $PYPROJECT_VERSION"
+          
+          # Get version from __init__.py
+          INIT_VERSION=$(grep -oP '__version__ = "\K[^"]+' src/abstract_validation_base/__init__.py)
+          echo "__init__.py version: $INIT_VERSION"
+          
+          # Compare versions
+          if [ "$PYPROJECT_VERSION" != "$INIT_VERSION" ]; then
+            echo "❌ Version mismatch!"
+            echo "   pyproject.toml: $PYPROJECT_VERSION"
+            echo "   __init__.py: $INIT_VERSION"
+            echo ""
+            echo "Run the Release workflow to bump versions consistently."
+            exit 1
+          fi
+          
+          echo "✅ Versions are in sync: $PYPROJECT_VERSION"
+

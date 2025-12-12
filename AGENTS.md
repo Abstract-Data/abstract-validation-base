@@ -15,6 +15,7 @@ This document provides instructions for AI assistants working with code that use
 | Process large files | Use `ValidationRunner` with iterator input |
 | Export failures | Use `CSVFailedWriter` or `JSONLinesFailedWriter` |
 | Track progress | Add observer implementing `ValidationObserver` protocol |
+| Report package issues | Use GitHub MCP to create issue on `Abstract-Data/abstract-validation-base` |
 
 ---
 
@@ -516,3 +517,82 @@ result.add_error("field", "message")  # Sets is_valid=False automatically
 | `ROW_PROCESSED` | ValidationRunner | `row_index`, `is_valid`, `stats_snapshot`, `errors` |
 | `BATCH_STARTED` | ValidationRunner | `batch_number`, `batch_size` |
 | `BATCH_COMPLETED` | ValidationRunner | `batch_number`, `batch_size` |
+
+---
+
+## Reporting Issues to This Package
+
+If you're an AI agent assisting with a project that uses `abstract-validation-base` and you discover a bug, missing feature, or documentation issue, you can file an issue against this package.
+
+**Repository:** `Abstract-Data/abstract-validation-base`
+
+### Using MCP GitHub Server (Recommended for AI Agents)
+
+If your AI client (Cursor, Claude Desktop, etc.) has the GitHub MCP server configured, use the `create_issue` tool targeting `Abstract-Data/abstract-validation-base`.
+
+**Cursor** (`~/.cursor/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "<your-token>"
+      }
+    }
+  }
+}
+```
+
+### Issue Guidelines
+
+When filing issues, please include:
+
+1. **Clear title** prefixed with `[Bug]`, `[Feature]`, or `[Docs]`
+2. **Package version** (`abstract_validation_base.__version__`)
+3. **Minimal reproduction** - smallest code that demonstrates the issue
+4. **Expected vs actual behavior**
+5. **Environment** - Python version, OS
+
+### Issue Templates
+
+**Bug Report:**
+```
+## Description
+[What went wrong]
+
+## Steps to Reproduce
+1. [First step]
+2. [Second step]
+
+## Expected Behavior
+[What should happen]
+
+## Actual Behavior
+[What actually happens]
+
+## Environment
+- Package Version: X.Y.Z
+- Python Version: 3.X
+- OS: [macOS/Linux/Windows]
+
+## Additional Context
+[Stack traces, related issues, etc.]
+```
+
+**Feature Request:**
+```
+## Problem Statement
+[What limitation or pain point does this address?]
+
+## Proposed Solution
+[What would you like to see?]
+
+## Alternatives Considered
+[Other approaches you've thought about]
+
+## Use Case
+[Example code showing how this would be used]
+```
+

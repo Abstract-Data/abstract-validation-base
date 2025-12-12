@@ -1,0 +1,140 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in abstract-validation-base
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the sections below to help us understand and reproduce the issue.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please confirm the following before submitting
+      options:
+        - label: I have searched existing issues to ensure this bug hasn't already been reported
+          required: true
+        - label: I am using the latest version of abstract-validation-base
+          required: true
+        - label: I have read the [documentation](https://github.com/Abstract-Data/abstract-validation-base#readme)
+          required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal code example that reproduces the issue
+      placeholder: |
+        ```python
+        from abstract_validation_base import ValidationBase
+
+        class MyModel(ValidationBase):
+            name: str
+
+        # Code that triggers the bug...
+        ```
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: I expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Instead, what happened was...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of the library is affected?
+      multiple: true
+      options:
+        - ValidationBase / ProcessLog
+        - BaseValidator / CompositeValidator
+        - ValidationRunner (streaming)
+        - Writers (CSV/JSON/Audit)
+        - ValidatedRecord (SQLModel)
+        - Rich Integration (observers/dashboard)
+        - Events / Observer Pattern
+        - Other / Unknown
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error Output / Stack Trace
+      description: If applicable, paste the full error message or stack trace
+      placeholder: |
+        Traceback (most recent call last):
+          File "...", line X, in <module>
+            ...
+        Error: ...
+      render: shell
+
+  - type: dropdown
+    id: python-version
+    attributes:
+      label: Python Version
+      description: Which Python version are you using?
+      options:
+        - "3.12"
+        - "3.11"
+        - "3.10"
+    validations:
+      required: true
+
+  - type: input
+    id: package-version
+    attributes:
+      label: Package Version
+      description: "Run: python -c \"import abstract_validation_base; print(abstract_validation_base.__version__)\""
+      placeholder: "e.g., 0.3.0a1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or information that might help
+      placeholder: Add any other context here...
+

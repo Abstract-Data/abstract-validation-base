@@ -1,0 +1,129 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for abstract-validation-base
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe your idea clearly so we can understand and evaluate it.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please confirm the following before submitting
+      options:
+        - label: I have searched existing issues to ensure this feature hasn't already been requested
+          required: true
+        - label: I have read the [documentation](https://github.com/Abstract-Data/abstract-validation-base#readme) to confirm this feature doesn't already exist
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What limitation or pain point does it address?
+      placeholder: |
+        I'm trying to accomplish X, but currently I have to...
+        
+        This is frustrating because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe what you'd like to see implemented
+      placeholder: |
+        I would like a way to...
+        
+        The API could look something like:
+        ```python
+        # Example usage
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches have you considered or tried?
+      placeholder: |
+        I've tried working around this by...
+        
+        Another approach could be...
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of the library would this feature affect?
+      multiple: true
+      options:
+        - ValidationBase / ProcessLog
+        - BaseValidator / CompositeValidator
+        - ValidationRunner (streaming)
+        - Writers (CSV/JSON/Audit)
+        - ValidatedRecord (SQLModel)
+        - Rich Integration (observers/dashboard)
+        - Events / Observer Pattern
+        - New Component
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case Example
+      description: Provide a concrete example showing how this feature would be used
+      placeholder: |
+        ```python
+        from abstract_validation_base import ...
+
+        # Example showing the feature in action
+        class MyModel(ValidationBase):
+            ...
+        
+        # This new feature would allow me to:
+        result = new_feature(...)
+        ```
+      render: python
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How important is this feature to you?
+      options:
+        - Nice to have
+        - Would significantly improve my workflow
+        - Blocking my use case
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to help implement this feature?
+      options:
+        - label: I would be willing to submit a PR for this feature
+          required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, mockups, or references that might help
+      placeholder: |
+        Related issues: #...
+        Similar features in other libraries: ...
+        Additional notes: ...
+

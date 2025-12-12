@@ -15,7 +15,8 @@ This document provides instructions for AI assistants working with code that use
 | Process large files | Use `ValidationRunner` with iterator input |
 | Export failures | Use `CSVFailedWriter` or `JSONLinesFailedWriter` |
 | Track progress | Add observer implementing `ValidationObserver` protocol |
-| Report package issues | Use GitHub MCP to create issue on `Abstract-Data/abstract-validation-base` |
+| Report package issues | Use `mcp_github_create_issue` with `[Bug]:`, `[Feature]:`, or `[Docs]:` title prefix |
+| Submit a PR | Run `ruff check`, `ruff format`, `mypy`, `pytest` locally first |
 
 ---
 
@@ -528,7 +529,7 @@ If you're an AI agent assisting with a project that uses `abstract-validation-ba
 
 ### Using MCP GitHub Server (Recommended for AI Agents)
 
-If your AI client (Cursor, Claude Desktop, etc.) has the GitHub MCP server configured, use the `create_issue` tool targeting `Abstract-Data/abstract-validation-base`.
+If your AI client (Cursor, Claude Desktop, etc.) has the GitHub MCP server configured, use the `mcp_github_create_issue` tool targeting `Abstract-Data/abstract-validation-base`.
 
 **Cursor** (`~/.cursor/mcp.json`):
 ```json
@@ -545,54 +546,136 @@ If your AI client (Cursor, Claude Desktop, etc.) has the GitHub MCP server confi
 }
 ```
 
-### Issue Guidelines
+### Issue Templates (Structured Forms)
 
-When filing issues, please include:
+This repository uses GitHub's YAML-based issue forms. When creating issues via MCP, format the body to match the template fields:
 
-1. **Clear title** prefixed with `[Bug]`, `[Feature]`, or `[Docs]`
-2. **Package version** (`abstract_validation_base.__version__`)
-3. **Minimal reproduction** - smallest code that demonstrates the issue
-4. **Expected vs actual behavior**
-5. **Environment** - Python version, OS
+**Bug Report** — Use title prefix `[Bug]: `
+```markdown
+### Prerequisites
+- [x] I have searched existing issues
+- [x] I am using the latest version
 
-### Issue Templates
+### Bug Description
+[Clear description of the bug]
 
-**Bug Report:**
+### Steps to Reproduce
+```python
+from abstract_validation_base import ValidationBase
+
+# Minimal code that reproduces the issue
 ```
-## Description
-[What went wrong]
 
-## Steps to Reproduce
-1. [First step]
-2. [Second step]
-
-## Expected Behavior
+### Expected Behavior
 [What should happen]
 
-## Actual Behavior
+### Actual Behavior
 [What actually happens]
 
-## Environment
-- Package Version: X.Y.Z
-- Python Version: 3.X
-- OS: [macOS/Linux/Windows]
+### Affected Component
+[ValidationBase / Validators / Runner / Writers / SQLModel / Rich / Events]
 
-## Additional Context
-[Stack traces, related issues, etc.]
+### Error Output
+```
+[Stack trace if applicable]
 ```
 
-**Feature Request:**
+### Environment
+- Package Version: [e.g., 0.3.0a1]
+- Python Version: [3.10 / 3.11 / 3.12]
+- OS: [macOS / Linux / Windows]
 ```
-## Problem Statement
+
+**Feature Request** — Use title prefix `[Feature]: `
+```markdown
+### Prerequisites
+- [x] I have searched existing issues
+- [x] I have read the documentation
+
+### Problem Statement
 [What limitation or pain point does this address?]
 
-## Proposed Solution
+### Proposed Solution
 [What would you like to see?]
 
-## Alternatives Considered
+### Alternatives Considered
 [Other approaches you've thought about]
 
-## Use Case
-[Example code showing how this would be used]
+### Affected Component
+[ValidationBase / Validators / Runner / Writers / SQLModel / Rich / New Component]
+
+### Use Case Example
+```python
+# Example code showing how this feature would be used
 ```
+
+### Priority
+[Nice to have / Would significantly improve workflow / Blocking use case]
+```
+
+**Documentation Issue** — Use title prefix `[Docs]: `
+```markdown
+### Issue Type
+[Missing / Incorrect / Unclear / Needs example / Typo / Outdated]
+
+### Location
+[README.md / AGENTS.md / Docstrings / API reference]
+
+### Problem Description
+[What's wrong or missing?]
+
+### Suggested Improvement
+[How should the documentation be improved?]
+```
+
+### Auto-Labeling
+
+Issues are automatically labeled based on content:
+
+| Keywords in Issue | Label Applied |
+|-------------------|---------------|
+| ValidationBase, add_error, ProcessLog | `component:base` |
+| BaseValidator, CompositeValidator, pipeline | `component:validators` |
+| ValidationRunner, streaming, large file | `component:runner` |
+| CSVFailedWriter, JSONLines, AuditReport | `component:writers` |
+| ValidatedRecord, SQLModel, to_db | `component:sqlmodel` |
+| RichDashboard, SimpleProgress, observer | `component:rich` |
+
+Bug reports automatically receive a helpful comment with relevant documentation links.
+
+---
+
+## Contributing Pull Requests
+
+When submitting PRs to this repository, ensure the following checks pass locally:
+
+### Pre-submission Checklist
+
+```bash
+# Linting
+uv run ruff check src tests
+uv run ruff format src tests
+
+# Type checking
+uv run mypy src
+
+# Tests
+uv run pytest
+```
+
+### PR Requirements
+
+1. **Link to related issue** — Reference with `Closes #123`
+2. **Type of change** — Bug fix, feature, docs, refactor, tests
+3. **Tests** — Add tests for new functionality
+4. **Documentation** — Update docs/docstrings for user-facing changes
+
+### CI Checks (Automated)
+
+These run automatically on PRs:
+- `ruff check` and `ruff format --check`
+- `mypy src`
+- `pytest --cov`
+
+PRs cannot be merged until all CI checks pass
 

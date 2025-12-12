@@ -1,0 +1,117 @@
+name: Documentation Issue
+description: Report missing, incorrect, or unclear documentation
+title: "[Docs]: "
+labels: ["documentation"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve the documentation! Please describe what needs to be added, corrected, or clarified.
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Documentation Issue Type
+      description: What kind of documentation issue is this?
+      options:
+        - Missing documentation (feature not documented)
+        - Incorrect documentation (docs don't match behavior)
+        - Unclear documentation (hard to understand)
+        - Needs code example (missing or incomplete examples)
+        - Typo or formatting issue
+        - Outdated documentation (refers to old API/behavior)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Where is the documentation issue located?
+      multiple: true
+      options:
+        - README.md
+        - AGENTS.md (AI guidelines)
+        - Module docstrings (base.py, validators.py, etc.)
+        - API reference / type hints
+        - Code comments
+        - Other / New documentation needed
+    validations:
+      required: true
+
+  - type: input
+    id: section
+    attributes:
+      label: Specific Section
+      description: If applicable, which section or heading?
+      placeholder: "e.g., 'Streaming Validation' or 'ValidationRunner.run()'"
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current Documentation
+      description: What does the current documentation say (if applicable)?
+      placeholder: |
+        The current docs state:
+        > "..."
+        
+        Or link to the section: https://github.com/...#section
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Description
+      description: What's wrong or missing?
+      placeholder: |
+        The documentation doesn't explain how to...
+        
+        The example is confusing because...
+        
+        This section is incorrect - the actual behavior is...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: How should the documentation be improved?
+      placeholder: |
+        The documentation should:
+        - Explain that...
+        - Include an example showing...
+        - Clarify that...
+        
+        Example of what the docs could say:
+        ```markdown
+        ## Section Title
+        
+        Description...
+        
+        ```python
+        # Example code
+        ```
+        ```
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to help improve the documentation?
+      options:
+        - label: I would be willing to submit a PR with documentation improvements
+          required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context or references
+      placeholder: |
+        Related to: #...
+        See also: ...
+

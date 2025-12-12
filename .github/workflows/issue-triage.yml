@@ -1,0 +1,193 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  label-components:
+    name: Auto-label by component
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add component labels based on issue content
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = (issue.body || '').toLowerCase();
+            const title = (issue.title || '').toLowerCase();
+            const content = `${title} ${body}`;
+            
+            const labelsToAdd = [];
+            
+            // Component detection patterns
+            const componentPatterns = {
+              'component:base': [
+                'validationbase', 'validation_base', 'processlog', 'process_log',
+                'add_error', 'add_cleaning', 'audit_log', 'has_errors', 'has_cleaning'
+              ],
+              'component:validators': [
+                'basevalidator', 'base_validator', 'compositevalidator', 'composite_validator',
+                'validatorpipeline', 'validator_pipeline', 'validationresult', 'validation_result',
+                'fail_fast'
+              ],
+              'component:runner': [
+                'validationrunner', 'validation_runner', 'streaming', 'large file',
+                'run_collect_valid', 'run_collect_failed', 'run_batch', 'rowresult',
+                'runnerstats', 'audit_report'
+              ],
+              'component:writers': [
+                'csvfailedwriter', 'csv_failed_writer', 'jsonlinesfailedwriter',
+                'jsonlines', 'auditreportwriter', 'audit_report_writer',
+                'write_all', 'write_one', 'failed_records'
+              ],
+              'component:sqlmodel': [
+                'validatedrecord', 'validated_record', 'sqlmodel', 'to_db',
+                'db_model', 'table_name'
+              ],
+              'component:rich': [
+                'richdashboard', 'rich_dashboard', 'simpleprogress', 'simple_progress',
+                'richobserver', 'dashboard', 'progress bar', 'live display'
+              ],
+              'component:events': [
+                'validationevent', 'validation_event', 'eventtype', 'event_type',
+                'observer', 'on_event', 'add_observer', 'observable'
+              ]
+            };
+            
+            // Check each component pattern
+            for (const [label, patterns] of Object.entries(componentPatterns)) {
+              for (const pattern of patterns) {
+                if (content.includes(pattern.toLowerCase())) {
+                  labelsToAdd.push(label);
+                  break;
+                }
+              }
+            }
+            
+            // Add labels if any were detected
+            if (labelsToAdd.length > 0) {
+              // First, ensure labels exist
+              for (const label of labelsToAdd) {
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label
+                  });
+                } catch (e) {
+                  // Label doesn't exist, create it
+                  const colors = {
+                    'component:base': 'c5def5',
+                    'component:validators': 'd4c5f9',
+                    'component:runner': 'bfdadc',
+                    'component:writers': 'fef2c0',
+                    'component:sqlmodel': 'f9d0c4',
+                    'component:rich': 'e99695',
+                    'component:events': 'd4e157'
+                  };
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: colors[label] || 'ededed',
+                    description: `Related to ${label.replace('component:', '')} module`
+                  });
+                }
+              }
+              
+              // Add labels to issue
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: labelsToAdd
+              });
+              
+              console.log(`Added labels: ${labelsToAdd.join(', ')}`);
+            }
+
+  add-helpful-comment:
+    name: Add helpful context
+    runs-on: ubuntu-latest
+    needs: label-components
+    steps:
+      - name: Post helpful comment based on issue type
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const labels = issue.labels.map(l => l.name);
+            const body = (issue.body || '').toLowerCase();
+            
+            // Only add comment for bug reports
+            if (!labels.includes('bug')) {
+              console.log('Not a bug report, skipping helpful comment');
+              return;
+            }
+            
+            // Build helpful resources based on detected components
+            const resources = [];
+            const debugTips = [];
+            
+            if (body.includes('validationbase') || body.includes('add_error') || body.includes('processlog')) {
+              resources.push('- [ValidationBase Model](https://github.com/Abstract-Data/abstract-validation-base#validationbase-model)');
+              debugTips.push('- Check that you\'re using `add_error()` instead of raising exceptions');
+              debugTips.push('- Verify `has_errors` and `error_count` properties for debugging');
+            }
+            
+            if (body.includes('validator') || body.includes('pipeline') || body.includes('composite')) {
+              resources.push('- [Validators & Pipelines](https://github.com/Abstract-Data/abstract-validation-base#validators--pipelines)');
+              debugTips.push('- Ensure validators inherit from `BaseValidator[T]` with correct type parameter');
+              debugTips.push('- Check that `validate()` returns `ValidationResult`, not raises exceptions');
+            }
+            
+            if (body.includes('runner') || body.includes('streaming') || body.includes('large')) {
+              resources.push('- [Streaming Validation](https://github.com/Abstract-Data/abstract-validation-base#streaming-validation)');
+              debugTips.push('- Ensure you\'re passing an iterator, not a materialized list');
+              debugTips.push('- Check `runner.stats` after iteration for detailed statistics');
+            }
+            
+            if (body.includes('writer') || body.includes('csv') || body.includes('json')) {
+              resources.push('- [Output Writers](https://github.com/Abstract-Data/abstract-validation-base#output-writers)');
+              debugTips.push('- Use context manager (`with writer:`) for proper file handling');
+            }
+            
+            if (body.includes('sqlmodel') || body.includes('validatedrecord') || body.includes('to_db')) {
+              resources.push('- [SQLModel Integration](https://github.com/Abstract-Data/abstract-validation-base#sqlmodel-integration)');
+              debugTips.push('- Ensure `table_name` parameter is set in class definition');
+            }
+            
+            if (body.includes('rich') || body.includes('dashboard') || body.includes('progress')) {
+              resources.push('- [Rich Console Integration](https://github.com/Abstract-Data/abstract-validation-base#rich-console-integration)');
+              debugTips.push('- Ensure `rich` is installed: `pip install abstract-validation-base[rich]`');
+            }
+            
+            // Only post if we have relevant resources
+            if (resources.length === 0 && debugTips.length === 0) {
+              console.log('No specific component detected, skipping comment');
+              return;
+            }
+            
+            let comment = `Thanks for reporting this issue! 🔍\n\n`;
+            
+            if (resources.length > 0) {
+              comment += `**Relevant Documentation:**\n${resources.join('\n')}\n\n`;
+            }
+            
+            if (debugTips.length > 0) {
+              comment += `**Quick Debugging Tips:**\n${debugTips.join('\n')}\n\n`;
+            }
+            
+            comment += `---\n*This is an automated message to help with initial triage. A maintainer will review your issue soon.*`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: comment
+            });
+

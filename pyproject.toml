@@ -1,6 +1,6 @@
 [project]
 name = "abstract-validation-base"
-version = "0.1.0"
+version = "0.2.0a1"
 description = "Validation and process tracking for data transformation pipelines"
 readme = "README.md"
 license = { text = "MIT" }

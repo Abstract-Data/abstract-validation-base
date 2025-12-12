@@ -12,6 +12,14 @@ on:
           - patch
           - minor
           - major
+          - alpha
+          - beta
+          - rc
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -41,13 +49,31 @@ jobs:
       - name: Bump version with uv
         id: bump
         run: |
-          # Bump the version in pyproject.toml
-          uv version ${{ inputs.bump }}
+          BUMP_TYPE="${{ inputs.bump }}"
           
-          # Get the new version (extract just the version number)
-          NEW_VERSION=$(uv version | awk '{print $2}')
+          # For alpha/beta/rc, we need to bump minor first if not already a prerelease
+          if [[ "$BUMP_TYPE" =~ ^(alpha|beta|rc)$ ]]; then
+            CURRENT_VERSION=$(uv version --short)
+            if [[ ! "$CURRENT_VERSION" =~ (a|b|rc)[0-9]+ ]]; then
+              # Not a prerelease, bump minor first
+              uv version --bump minor
+            fi
+            uv version --bump "$BUMP_TYPE"
+          else
+            uv version --bump "$BUMP_TYPE"
+          fi
+          
+          # Get the new version
+          NEW_VERSION=$(uv version --short)
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
+          
+          # Check if it's a prerelease version
+          if [[ "$NEW_VERSION" =~ (a|b|rc)[0-9]+ ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Sync version to __init__.py
         run: |
@@ -59,7 +85,7 @@ jobs:
       - name: Commit version bump
         run: |
           VERSION="${{ steps.bump.outputs.new_version }}"
-          git add pyproject.toml src/abstract_validation_base/__init__.py
+          git add pyproject.toml uv.lock src/abstract_validation_base/__init__.py
           git commit -m "chore: bump version to $VERSION"
 
       - name: Create and push tag
@@ -74,6 +100,6 @@ jobs:
           tag_name: v${{ steps.bump.outputs.new_version }}
           name: Release v${{ steps.bump.outputs.new_version }}
           generate_release_notes: true
+          prerelease: ${{ steps.bump.outputs.is_prerelease == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

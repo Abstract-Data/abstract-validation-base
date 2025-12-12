@@ -110,7 +110,7 @@ class TestRowResult:
 
     def test_error_summary_handles_empty_loc_tuple(self) -> None:
         """Test error_summary handles Pydantic errors with empty loc tuple.
-        
+
         This can occur with model_validator failures on nested models where
         Pydantic may return an empty location tuple.
         """

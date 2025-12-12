@@ -1,11 +1,9 @@
 # abstract-validation-base
 
 [![Tests](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/tests.yml/badge.svg)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/tests.yml)
-[![Lint](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/lint.yml/badge.svg)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/lint.yml)
+[![Ruff](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/lint.yml/badge.svg)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/lint.yml)
 [![Version Check](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/version-check.yml/badge.svg)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/version-check.yml)
 [![codecov](https://codecov.io/gh/Abstract-Data/abstract-validation-base/graph/badge.svg)](https://codecov.io/gh/Abstract-Data/abstract-validation-base)
-[![PyPI version](https://img.shields.io/pypi/v/abstract-validation-base.svg)](https://pypi.org/project/abstract-validation-base/)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![MyPy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 

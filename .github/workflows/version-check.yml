@@ -22,8 +22,8 @@ jobs:
 
       - name: Check version sync
         run: |
-          # Get version from pyproject.toml using uv
-          PYPROJECT_VERSION=$(uv version)
+          # Get version from pyproject.toml using uv (extract just the version number)
+          PYPROJECT_VERSION=$(uv version | awk '{print $2}')
           echo "pyproject.toml version: $PYPROJECT_VERSION"
           
           # Get version from __init__.py

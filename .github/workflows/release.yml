@@ -44,8 +44,8 @@ jobs:
           # Bump the version in pyproject.toml
           uv version ${{ inputs.bump }}
           
-          # Get the new version
-          NEW_VERSION=$(uv version)
+          # Get the new version (extract just the version number)
+          NEW_VERSION=$(uv version | awk '{print $2}')
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
 

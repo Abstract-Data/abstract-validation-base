@@ -1,9 +1,9 @@
 # abstract-validation-base
 
-[![Tests](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/tests.yml/badge.svg)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/tests.yml)
-[![Ruff](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/lint.yml/badge.svg)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/lint.yml)
-[![Version Check](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/version-check.yml/badge.svg)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/version-check.yml)
-[![codecov](https://codecov.io/gh/Abstract-Data/abstract-validation-base/graph/badge.svg)](https://codecov.io/gh/Abstract-Data/abstract-validation-base)
+[![Tests](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/tests.yml)
+[![Ruff](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/lint.yml)
+[![Version Check](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/version-check.yml/badge.svg?branch=master)](https://github.com/Abstract-Data/abstract-validation-base/actions/workflows/version-check.yml)
+[![codecov](https://codecov.io/gh/Abstract-Data/abstract-validation-base/graph/badge.svg?token=WPV48XDDO9)](https://codecov.io/gh/Abstract-Data/abstract-validation-base)
 [![MyPy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 

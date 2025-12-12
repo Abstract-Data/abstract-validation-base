@@ -7,6 +7,11 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, rule
 
+from abstract_validation_base import (
+    ValidationEvent,
+    ValidationEventType,
+    ValidatorPipelineBuilder,
+)
 from abstract_validation_base.protocols import ValidatorProtocol
 from abstract_validation_base.results import ValidationResult
 from abstract_validation_base.validators import BaseValidator, CompositeValidator
@@ -605,3 +610,234 @@ class TestValidatorIntegration:
         assert call_order == ["v1", "v2"]  # v3 should not have run
         assert not result.is_valid
         assert len(result.errors) == 1
+
+
+# =============================================================================
+# ValidatorPipelineBuilder Tests
+# =============================================================================
+
+
+class TestValidatorPipelineBuilder:
+    """Tests for ValidatorPipelineBuilder."""
+
+    def test_build_empty_pipeline(self) -> None:
+        """Test building an empty pipeline."""
+        pipeline = ValidatorPipelineBuilder[SampleModel]("empty").build()
+
+        assert pipeline.name == "empty"
+        assert len(pipeline) == 0
+
+    def test_build_with_validators(self) -> None:
+        """Test building a pipeline with validators."""
+        pipeline = (
+            ValidatorPipelineBuilder[SampleModel]("test_pipeline")
+            .add(SimpleValidator("v1"))
+            .add(SimpleValidator("v2"))
+            .build()
+        )
+
+        assert pipeline.name == "test_pipeline"
+        assert len(pipeline) == 2
+        assert pipeline.validator_names == ["v1", "v2"]
+
+    def test_fluent_interface(self) -> None:
+        """Test that all methods return self for chaining."""
+        builder = ValidatorPipelineBuilder[SampleModel]("test")
+
+        result = builder.add(SimpleValidator("v1"))
+        assert result is builder
+
+        result = builder.fail_fast()
+        assert result is builder
+
+        result = builder.with_name("new_name")
+        assert result is builder
+
+    def test_fail_fast_setting(self) -> None:
+        """Test fail_fast setting is applied."""
+        pipeline = (
+            ValidatorPipelineBuilder[SampleModel]("test")
+            .add(FailingValidator("fail1", "f1", "e1"))
+            .add(FailingValidator("fail2", "f2", "e2"))
+            .fail_fast()
+            .build()
+        )
+
+        model = SampleModel(name="test")
+        result = pipeline.validate(model)
+
+        # With fail_fast, only first error should be present
+        assert len(result.errors) == 1
+
+    def test_fail_fast_disabled(self) -> None:
+        """Test fail_fast can be explicitly disabled."""
+        pipeline = (
+            ValidatorPipelineBuilder[SampleModel]("test")
+            .add(FailingValidator("fail1", "f1", "e1"))
+            .add(FailingValidator("fail2", "f2", "e2"))
+            .fail_fast(False)
+            .build()
+        )
+
+        model = SampleModel(name="test")
+        result = pipeline.validate(model)
+
+        # Without fail_fast, both errors should be present
+        assert len(result.errors) == 2
+
+    def test_with_name(self) -> None:
+        """Test changing name after initialization."""
+        pipeline = ValidatorPipelineBuilder[SampleModel]("initial").with_name("final").build()
+
+        assert pipeline.name == "final"
+
+    def test_validators_copied(self) -> None:
+        """Test that validators list is copied, not shared."""
+        builder = ValidatorPipelineBuilder[SampleModel]("test")
+        builder.add(SimpleValidator("v1"))
+
+        pipeline1 = builder.build()
+        builder.add(SimpleValidator("v2"))
+        pipeline2 = builder.build()
+
+        assert len(pipeline1) == 1
+        assert len(pipeline2) == 2
+
+    def test_repr(self) -> None:
+        """Test __repr__ output."""
+        builder = (
+            ValidatorPipelineBuilder[SampleModel]("my_pipeline")
+            .add(SimpleValidator("v1"))
+            .fail_fast()
+        )
+
+        repr_str = repr(builder)
+
+        assert "ValidatorPipelineBuilder" in repr_str
+        assert "my_pipeline" in repr_str
+        assert "1" in repr_str  # validator count
+        assert "True" in repr_str  # fail_fast
+
+
+# =============================================================================
+# CompositeValidator Observer Tests
+# =============================================================================
+
+
+class RecordingObserver:
+    """Observer that records all events."""
+
+    def __init__(self) -> None:
+        self.events: list[ValidationEvent] = []
+
+    def on_event(self, event: ValidationEvent) -> None:
+        self.events.append(event)
+
+
+class TestCompositeValidatorObserver:
+    """Tests for CompositeValidator observer functionality."""
+
+    def test_emits_validation_started_event(self) -> None:
+        """Test that VALIDATION_STARTED event is emitted."""
+        composite = CompositeValidator[SampleModel](
+            validators=[SimpleValidator("v1")],
+            name="test_composite",
+        )
+        observer = RecordingObserver()
+        composite.add_observer(observer)
+
+        model = SampleModel(name="test")
+        composite.validate(model)
+
+        started_events = [
+            e for e in observer.events if e.event_type == ValidationEventType.VALIDATION_STARTED
+        ]
+        assert len(started_events) == 1
+
+        event = started_events[0]
+        assert event.source is composite
+        assert event.data["validator_name"] == "test_composite"
+        assert event.data["validator_count"] == 1
+
+    def test_emits_validation_completed_event(self) -> None:
+        """Test that VALIDATION_COMPLETED event is emitted."""
+        composite = CompositeValidator[SampleModel](
+            validators=[SimpleValidator("v1")],
+            name="test_composite",
+        )
+        observer = RecordingObserver()
+        composite.add_observer(observer)
+
+        model = SampleModel(name="test")
+        composite.validate(model)
+
+        completed_events = [
+            e for e in observer.events if e.event_type == ValidationEventType.VALIDATION_COMPLETED
+        ]
+        assert len(completed_events) == 1
+
+        event = completed_events[0]
+        assert event.source is composite
+        assert event.data["validator_name"] == "test_composite"
+        assert event.data["is_valid"] is True
+        assert event.data["error_count"] == 0
+        assert "duration_ms" in event.data
+
+    def test_completed_event_reflects_failure(self) -> None:
+        """Test that VALIDATION_COMPLETED reflects validation failure."""
+        composite = CompositeValidator[SampleModel](
+            validators=[FailingValidator("fail", "field", "error")],
+        )
+        observer = RecordingObserver()
+        composite.add_observer(observer)
+
+        model = SampleModel(name="test")
+        composite.validate(model)
+
+        completed_events = [
+            e for e in observer.events if e.event_type == ValidationEventType.VALIDATION_COMPLETED
+        ]
+
+        event = completed_events[0]
+        assert event.data["is_valid"] is False
+        assert event.data["error_count"] == 1
+
+    def test_events_in_correct_order(self) -> None:
+        """Test that events are emitted in correct order."""
+        composite = CompositeValidator[SampleModel](
+            validators=[SimpleValidator("v1")],
+        )
+        observer = RecordingObserver()
+        composite.add_observer(observer)
+
+        model = SampleModel(name="test")
+        composite.validate(model)
+
+        assert len(observer.events) == 2
+        assert observer.events[0].event_type == ValidationEventType.VALIDATION_STARTED
+        assert observer.events[1].event_type == ValidationEventType.VALIDATION_COMPLETED
+
+    def test_duration_measured(self) -> None:
+        """Test that duration is measured in completed event."""
+        composite = CompositeValidator[SampleModel](
+            validators=[SimpleValidator("v1")],
+        )
+        observer = RecordingObserver()
+        composite.add_observer(observer)
+
+        model = SampleModel(name="test")
+        composite.validate(model)
+
+        completed_event = observer.events[1]
+        assert completed_event.data["duration_ms"] >= 0
+
+    def test_no_observers_no_error(self) -> None:
+        """Test that validation works without observers."""
+        composite = CompositeValidator[SampleModel](
+            validators=[SimpleValidator("v1")],
+        )
+
+        model = SampleModel(name="test")
+        result = composite.validate(model)
+
+        assert result.is_valid

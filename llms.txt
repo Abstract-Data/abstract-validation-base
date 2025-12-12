@@ -1,0 +1,328 @@
+# abstract-validation-base
+
+> Production-ready validation and process tracking for data transformation pipelines.
+
+## Overview
+
+Build robust ETL pipelines with full audit trails, composable validators, streaming batch processing, and seamless Pydantic integration. Tracks cleaning operations and errors with timestamps for DataFrame export.
+
+## Installation
+
+```bash
+pip install abstract-validation-base
+# or
+uv add abstract-validation-base
+```
+
+---
+
+## Core Classes
+
+### ValidationBase
+Pydantic base model with automatic process logging and observer support.
+
+```python
+from abstract_validation_base import ValidationBase
+
+class Contact(ValidationBase):
+    name: str
+    email: str
+
+contact = Contact(name="john", email="john@example.com")
+contact.add_cleaning_process("name", "john", "John", "Title case")
+contact.add_error("email", "Domain not allowed", contact.email)
+
+print(contact.has_errors)      # True
+print(contact.audit_log())     # List[dict] for DataFrame
+```
+
+**Key methods:**
+- `add_error(field, message, value?, context?, raise_exception?)` - Log error
+- `add_cleaning_process(field, original, new, reason, operation_type?)` - Log transformation
+- `audit_log(source?)` - Export entries as list[dict]
+- `audit_log_recursive(source?)` - Include nested ValidationBase models
+- `has_errors`, `has_cleaning`, `error_count`, `cleaning_count` - Properties
+- `add_observer(observer)`, `remove_observer(observer)`, `notify(event)` - Observer pattern
+
+### BaseValidator[T]
+Abstract base for creating type-safe validators.
+
+```python
+from abstract_validation_base import BaseValidator, ValidationResult
+
+class EmailValidator(BaseValidator[Contact]):
+    @property
+    def name(self) -> str:
+        return "email_validator"
+    
+    def validate(self, item: Contact) -> ValidationResult:
+        result = ValidationResult(is_valid=True)
+        if "@" not in item.email:
+            result.add_error("email", "Invalid format", item.email)
+        return result
+```
+
+**Required:**
+- `name` property (str) - Validator identifier
+- `validate(item: T) -> ValidationResult` - Validation logic
+
+### CompositeValidator[T]
+Combine multiple validators into a pipeline.
+
+```python
+from abstract_validation_base import CompositeValidator
+
+pipeline = CompositeValidator[Contact](
+    validators=[EmailValidator(), PhoneValidator()],
+    name="contact_pipeline",
+    fail_fast=False  # Run all validators (default)
+)
+result = pipeline.validate(contact)
+```
+
+**Methods:**
+- `validate(item)` - Run all validators, merge results
+- `add_validator(validator)` - Add dynamically
+- `remove_validator(name)` - Remove by name
+- `has_validator(name)`, `get_validator(name)` - Query validators
+
+### ValidatorPipelineBuilder[T]
+Fluent builder for validation pipelines.
+
+```python
+from abstract_validation_base import ValidatorPipelineBuilder
+
+pipeline = (
+    ValidatorPipelineBuilder[Contact]("pipeline")
+    .add(EmailValidator())
+    .add(PhoneValidator())
+    .fail_fast()
+    .build()
+)
+```
+
+### ValidationResult
+Container for validation status and errors.
+
+```python
+from abstract_validation_base import ValidationResult
+
+result = ValidationResult(is_valid=True)
+result.add_error("field", "message", "value")  # Sets is_valid=False
+result.merge(other_result)  # Combine results
+```
+
+### ValidatedRecord
+SQLModel integration - define once, get validation + DB model.
+
+```python
+from abstract_validation_base import ValidatedRecord
+
+class CustomerRecord(ValidatedRecord, table_name="customers"):
+    email: str
+    name: str
+
+customer = CustomerRecord(email="test@example.com", name="Test")
+customer.add_error("email", "Invalid domain")
+
+db_record = customer.to_db()          # SQLModel instance
+CustomerDB = CustomerRecord.db_model() # SQLModel class
+```
+
+---
+
+## Streaming Runner (Large Files)
+
+### ValidationRunner[T]
+Memory-efficient batch validation using iterators.
+
+```python
+from abstract_validation_base import ValidationRunner
+import csv
+
+with open("large_file.csv") as f:
+    reader = csv.DictReader(f)
+    runner = ValidationRunner(
+        data=reader,
+        model_class=Contact,
+        validators=pipeline,        # Optional custom validators
+        total_hint=1_000_000,       # For progress percentage
+    )
+    
+    # Streaming - results not stored in memory
+    for result in runner.run():
+        if result.is_valid:
+            save(result.model)
+        else:
+            log_errors(result.error_summary)
+    
+    # Stats available after iteration
+    print(runner.stats.success_rate)
+    print(runner.audit_report())
+```
+
+**Convenience methods:**
+- `run_collect_valid()` - Yield only valid models
+- `run_collect_failed()` - Yield only failed RowResults
+- `run_batch_valid(batch_size=100)` - Yield batches for bulk insert
+
+**Parallel processing:**
+```python
+for result in runner.run(workers=4, chunk_size=10000):
+    process(result)
+```
+
+### RowResult[T]
+Result for a single row validation.
+
+- `is_valid` - Passed all validation
+- `model` - Validated model (if valid)
+- `raw_data` - Original dict
+- `error_summary` - List of (field, message) tuples
+
+### RunnerStats
+Statistics tracked during validation.
+
+- `total_rows`, `valid_rows`, `error_rows`
+- `success_rate` - Percentage (0-100)
+- `top_errors(n=10)` - Most common errors
+- `duration_ms` - Processing time
+
+---
+
+## Observer Pattern
+
+### ValidationEventType
+Events emitted during validation:
+- `ERROR_ADDED` - Error logged on model
+- `CLEANING_ADDED` - Cleaning operation logged
+- `VALIDATION_STARTED` - Validation begins
+- `VALIDATION_COMPLETED` - Validation ends
+- `ROW_PROCESSED` - Single row processed (runner)
+- `BATCH_STARTED`, `BATCH_COMPLETED` - Batch events
+
+### ValidationObserver Protocol
+```python
+from abstract_validation_base import ValidationObserver, ValidationEvent
+
+class LoggingObserver:
+    def on_event(self, event: ValidationEvent) -> None:
+        print(f"{event.event_type.name}: {event.data}")
+
+model.add_observer(LoggingObserver())
+runner.add_observer(LoggingObserver())
+```
+
+### Rich Observers (requires `pip install rich`)
+
+```python
+from abstract_validation_base import SimpleProgressObserver, RichDashboardObserver
+from rich.progress import Progress
+
+# Simple progress bar
+with Progress() as progress:
+    observer = SimpleProgressObserver(progress)
+    runner.add_observer(observer)
+    for result in runner.run():
+        process(result)
+
+# Full dashboard with live error table
+with RichDashboardObserver() as observer:
+    runner.add_observer(observer)
+    for result in runner.run():
+        process(result)
+```
+
+---
+
+## Output Writers
+
+### CSVFailedWriter
+Export failed records to CSV.
+
+```python
+from abstract_validation_base import CSVFailedWriter
+
+writer = CSVFailedWriter("failed_records.csv")
+count = writer.write_all(runner.run_collect_failed())
+```
+
+### JSONLinesFailedWriter
+Export failed records to JSON Lines.
+
+```python
+from abstract_validation_base import JSONLinesFailedWriter
+
+writer = JSONLinesFailedWriter("failed.jsonl")
+count = writer.write_all(runner.run_collect_failed())
+```
+
+### AuditReportWriter
+Export validation summary reports.
+
+```python
+from abstract_validation_base import AuditReportWriter
+
+writer = AuditReportWriter("audit.json")  # or "audit.csv"
+writer.write(runner.audit_report())
+```
+
+---
+
+## Key Patterns
+
+### Basic Validation Pipeline
+```python
+from abstract_validation_base import (
+    ValidationBase,
+    BaseValidator,
+    CompositeValidator,
+    ValidationResult,
+)
+
+class MyModel(ValidationBase):
+    field: str
+
+class MyValidator(BaseValidator[MyModel]):
+    @property
+    def name(self) -> str:
+        return "my_validator"
+    
+    def validate(self, item: MyModel) -> ValidationResult:
+        result = ValidationResult(is_valid=True)
+        if not item.field:
+            result.add_error("field", "Required")
+        return result
+
+pipeline = CompositeValidator[MyModel](validators=[MyValidator()])
+result = pipeline.validate(MyModel(field="test"))
+```
+
+### ETL with Audit Trail
+```python
+import csv
+import pandas as pd
+from abstract_validation_base import ValidationRunner, CSVFailedWriter
+
+with open("input.csv") as f:
+    runner = ValidationRunner(csv.DictReader(f), MyModel, validators=pipeline)
+    
+    valid_records = []
+    for result in runner.run():
+        if result.is_valid and result.model:
+            valid_records.append(result.model)
+    
+    # Export audit
+    audit_df = pd.DataFrame(runner.audit_report()["top_errors"])
+```
+
+---
+
+## Important Constraints
+
+1. **Validators return ValidationResult, never raise exceptions** for validation failures
+2. **Use `result.add_error()`** which automatically sets `is_valid=False`
+3. **Don't modify items inside `validate()`** - validators should be side-effect free
+4. **ValidationRunner accepts iterators** - don't materialize large files into lists
+5. **process_log is excluded from serialization** - use `audit_log()` to export
+6. **Type parameter T must match** between validator and model being validated

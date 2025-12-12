@@ -11,12 +11,17 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_core import PydanticCustomError
 
+from abstract_validation_base.events import (
+    ObservableMixin,
+    ValidationEvent,
+    ValidationEventType,
+)
 from abstract_validation_base.process_log import ProcessEntry, ProcessLog
 
 __all__ = ["ValidationBase"]
 
 
-class ValidationBase(BaseModel):
+class ValidationBase(ObservableMixin, BaseModel):
     """Base model with built-in process logging for cleaning and errors.
 
     All models inheriting from this class automatically get:
@@ -24,11 +29,13 @@ class ValidationBase(BaseModel):
     - add_error(): Log an error and optionally raise ValidationError
     - add_cleaning_process(): Log a cleaning/transformation operation
     - audit_log(): Export combined entries for DataFrame analysis
+    - audit_log_recursive(): Export entries including nested models
     - has_errors: Property to check if any errors were logged
     - has_cleaning: Property to check if any cleaning operations occurred
+    - Observer support: add_observer(), remove_observer(), notify()
 
     Example:
-        from ryandata_validation import ValidationBase
+        from abstract_validation_base import ValidationBase
 
         class MyModel(ValidationBase):
             name: str
@@ -40,6 +47,10 @@ class ValidationBase(BaseModel):
 
         print(model.has_errors)  # True
         print(model.audit_log())
+
+        # Observer support
+        model.add_observer(my_observer)
+        model.add_error("field", "error")  # Observer notified
     """
 
     model_config = ConfigDict(
@@ -113,6 +124,10 @@ class ValidationBase(BaseModel):
         Raises:
             Exception: If raise_exception is True. The exception type is
                 determined by _create_error() which can be overridden.
+
+        Note:
+            This method emits a ValidationEventType.ERROR_ADDED event
+            to all registered observers.
         """
         entry = ProcessEntry(
             entry_type="error",
@@ -122,6 +137,20 @@ class ValidationBase(BaseModel):
             context=context or {},
         )
         self.process_log.errors.append(entry)
+
+        # Notify observers of the error
+        self.notify(
+            ValidationEvent(
+                event_type=ValidationEventType.ERROR_ADDED,
+                source=self,
+                data={
+                    "field": field,
+                    "message": message,
+                    "value": value,
+                    "context": context or {},
+                },
+            )
+        )
 
         if raise_exception:
             raise self._create_error(
@@ -147,6 +176,10 @@ class ValidationBase(BaseModel):
             reason: Explanation of why the cleaning was performed.
             operation_type: Category of operation (cleaning, normalization,
                 formatting, expansion, etc.).
+
+        Note:
+            This method emits a ValidationEventType.CLEANING_ADDED event
+            to all registered observers.
         """
         entry = ProcessEntry(
             entry_type="cleaning",
@@ -157,6 +190,21 @@ class ValidationBase(BaseModel):
             context={"operation_type": operation_type},
         )
         self.process_log.cleaning.append(entry)
+
+        # Notify observers of the cleaning operation
+        self.notify(
+            ValidationEvent(
+                event_type=ValidationEventType.CLEANING_ADDED,
+                source=self,
+                data={
+                    "field": field,
+                    "original_value": original_value,
+                    "new_value": new_value,
+                    "reason": reason,
+                    "operation_type": operation_type,
+                },
+            )
+        )
 
     def audit_log(self, source: str | None = None) -> list[dict[str, Any]]:
         """Export combined cleaning and error entries for DataFrame analysis.
@@ -185,3 +233,55 @@ class ValidationBase(BaseModel):
         """Clear all logged entries. Useful for reprocessing."""
         self.process_log.cleaning.clear()
         self.process_log.errors.clear()
+
+    def audit_log_recursive(self, source: str | None = None) -> list[dict[str, Any]]:
+        """Export audit logs from this model and all nested ValidationBase models.
+
+        Traverses nested models and aggregates their process logs with qualified
+        field names (e.g., "address.city" for nested address model).
+
+        Args:
+            source: Optional source identifier prefix.
+
+        Returns:
+            Combined list of dicts from this model and all nested models,
+            sorted by timestamp.
+
+        Example:
+            class Address(ValidationBase):
+                city: str
+
+            class Person(ValidationBase):
+                name: str
+                address: Address
+
+            person = Person(name="John", address=Address(city="NYC"))
+            person.address.add_error("city", "Invalid city")
+            person.add_error("name", "Name too short")
+
+            # Gets ALL entries with qualified names
+            all_logs = person.audit_log_recursive(source="import_batch_1")
+            # Returns entries with source like "import_batch_1.address"
+        """
+        entries = self.audit_log(source=source)
+
+        for field_name in self.__class__.model_fields:
+            if field_name == "process_log":
+                continue
+            value = getattr(self, field_name, None)
+
+            # Handle single nested model
+            if isinstance(value, ValidationBase):
+                nested_source = f"{source}.{field_name}" if source else field_name
+                entries.extend(value.audit_log_recursive(source=nested_source))
+
+            # Handle list of nested models
+            elif isinstance(value, list):
+                for i, item in enumerate(value):
+                    if isinstance(item, ValidationBase):
+                        nested_source = (
+                            f"{source}.{field_name}[{i}]" if source else f"{field_name}[{i}]"
+                        )
+                        entries.extend(item.audit_log_recursive(source=nested_source))
+
+        return sorted(entries, key=lambda x: x.get("timestamp", ""))

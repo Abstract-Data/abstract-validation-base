@@ -15,8 +15,106 @@ This document provides instructions for AI assistants working with code that use
 | Process large files | Use `ValidationRunner` with iterator input |
 | Export failures | Use `CSVFailedWriter` or `JSONLinesFailedWriter` |
 | Track progress | Add observer implementing `ValidationObserver` protocol |
+| Profile data during validation | Use `WhylogsObserver` |
+| Write tests | Use Hypothesis for property-based, stateful, and unit tests |
 | Report package issues | Use `mcp_github_create_issue` with `[Bug]:`, `[Feature]:`, or `[Docs]:` title prefix |
 | Submit a PR | Run `ruff check`, `ruff format`, `mypy`, `pytest` locally first |
+| Plan complex tasks | Use `STEP# - AGENT#:` prefix format for parallel-safe task breakdown |
+
+---
+
+## Task Planning for Parallel Execution
+
+When planning complex tasks, structure them to show parallelization opportunities. This enables:
+- **Multi-agent execution** — Multiple Cursor sessions or agents can work simultaneously
+- **Clear dependencies** — Steps are sequential barriers; agents within steps are parallel-safe
+- **Single-agent fallback** — One agent can work through tasks top-to-bottom sequentially
+
+### Plan Format
+
+```
+STEP 1 - AGENT A: [Task that can run in parallel with B and C]
+STEP 1 - AGENT B: [Task that can run in parallel with A and C]
+STEP 1 - AGENT C: [Task that can run in parallel with A and B]
+STEP 2 - AGENT A: [Depends on all STEP 1 tasks completing]
+STEP 2 - AGENT B: [Depends on all STEP 1 tasks completing]
+STEP 3 - AGENT A: [Final integration task]
+```
+
+### Planning Rules
+
+1. **Steps are sequential barriers** — All tasks in STEP N must complete before STEP N+1 begins
+2. **Agents within a step are parallel-safe** — No dependencies between same-step tasks
+3. **Single agent mode** — Work through tasks top-to-bottom, treating agent labels as informational
+4. **Multi-agent mode** — Different sessions claim different agent letters for true parallelism
+
+### Dependency Checklist
+
+Before assigning parallel agents to the same step, verify:
+
+- [ ] **No shared file sections** — Agents edit different files or non-overlapping sections
+- [ ] **No import dependencies** — Task B doesn't import something Task A is creating
+- [ ] **No shared test fixtures** — Parallel test changes don't conflict
+- [ ] **No database migrations** — Only one agent modifies schema at a time
+
+### Example Plan: Adding New Validator Types
+
+```
+STEP 1 - AGENT A: Create EmailValidator class in src/abstract_validation_base/validators.py
+STEP 1 - AGENT B: Create PhoneValidator class in src/abstract_validation_base/validators.py (separate section)
+STEP 1 - AGENT C: Add Hypothesis strategies for email/phone generation in tests/conftest.py
+
+STEP 2 - AGENT A: Write property-based tests for EmailValidator in tests/test_validators.py
+STEP 2 - AGENT B: Write property-based tests for PhoneValidator in tests/test_validators.py
+STEP 2 - AGENT C: Write stateful tests for validator combinations in tests/test_validators.py
+
+STEP 3 - AGENT A: Add exports to __init__.py and update type stubs
+STEP 3 - AGENT B: Run full test suite, fix any integration issues
+
+STEP 4 - AGENT A: Update README.md with usage examples
+```
+
+### How Agents Should Use This
+
+**When creating a plan:**
+1. Identify independent work units
+2. Group truly parallel tasks into the same STEP
+3. Assign different AGENT letters to parallel tasks
+4. Put dependent work in later STEPs
+5. **Name each task with the `STEP# - AGENT#:` prefix** so it appears clearly in the Agents panel
+
+**Task Naming Convention:**
+```
+✅ Good: "STEP 1 - AGENT A: Create EmailValidator class"
+✅ Good: "STEP 2 - AGENT B: Write property tests for PhoneValidator"
+❌ Bad:  "Create EmailValidator class"
+❌ Bad:  "Task 1: Create EmailValidator"
+```
+
+The prefix makes it easy to:
+- Identify which step a task belongs to
+- See which agent slot is assigned
+- Track parallel work in the Agents panel
+- Understand task dependencies at a glance
+
+**When executing a plan (single agent):**
+1. Work through tasks in order: STEP 1A → 1B → 1C → STEP 2A → 2B → ...
+2. Complete all tasks regardless of agent assignment
+
+**When executing a plan (multiple agents/sessions):**
+1. Each session claims an agent letter (A, B, or C)
+2. Work only on tasks matching your agent letter
+3. Wait at step boundaries for other agents to complete
+4. Coordinate via git commits or shared status file
+
+### Agent Awareness
+
+| Environment | Agent Awareness |
+|-------------|-----------------|
+| Single Cursor session | Agent sees full plan, executes sequentially |
+| Multiple Cursor sessions | Each session independent; coordinate manually via git |
+| Cursor Plan Mode (multi-agent) | Cursor may auto-distribute; agents see their assignments |
+| External orchestration (AutoGen, CrewAI) | Orchestrator assigns tasks; agents receive specific work |
 
 ---
 
@@ -381,6 +479,113 @@ class CustomObserver:
 runner.add_observer(CustomObserver())
 ```
 
+### Data Profiling with whylogs
+
+Use `WhylogsObserver` to automatically profile your data during validation. This enables data quality monitoring, drift detection, and statistical comparison between raw input data and validated outputs.
+
+**Installation:**
+
+```bash
+pip install abstract-validation-base[whylogs]
+```
+
+**Basic Usage:**
+
+```python
+import csv
+from abstract_validation_base import ValidationRunner, WhylogsObserver
+
+# Create observer with default settings
+observer = WhylogsObserver(
+    chunk_size=10000,      # Rows to buffer before profiling (memory vs latency tradeoff)
+    profile_raw=True,      # Profile all input data
+    profile_valid=True,    # Profile only records that pass validation
+)
+
+with open("data.csv") as f:
+    runner = ValidationRunner(csv.DictReader(f), MyModel)
+    runner.add_observer(observer)
+    
+    for result in runner.run():
+        process(result)
+
+# After validation completes, retrieve profiles
+profiles = observer.get_profiles()
+```
+
+**Exporting Profiles:**
+
+```python
+# Write to whylogs binary format (recommended for large profiles)
+paths = profiles.write(
+    raw_path="output/raw_profile.bin",
+    valid_path="output/valid_profile.bin",
+)
+
+# Convert to pandas DataFrames for analysis
+dfs = profiles.to_pandas()
+raw_stats = dfs["raw"]   # DataFrame with column statistics
+valid_stats = dfs["valid"]
+```
+
+**Comparing Raw vs Valid Profiles:**
+
+```python
+# Get comparison statistics
+comparison = observer.compare_profiles()
+
+print(f"Pass rate: {comparison.pass_rate:.1%}")
+print(f"Raw columns: {comparison.raw_column_count}")
+print(f"Valid columns: {comparison.valid_column_count}")
+print(f"Columns only in raw: {comparison.columns_only_in_raw}")
+print(f"Columns only in valid: {comparison.columns_only_in_valid}")
+
+# Serialize comparison for reporting
+report = comparison.to_dict()
+```
+
+**Selective Profiling:**
+
+```python
+# Profile only raw data (useful for diagnosing input issues)
+observer = WhylogsObserver(profile_raw=True, profile_valid=False)
+
+# Profile only valid data (useful for downstream quality checks)
+observer = WhylogsObserver(profile_raw=False, profile_valid=True)
+```
+
+**With Custom Schema:**
+
+```python
+from whylogs.core.schema import DatasetSchema, DeclarativeSchema
+from whylogs.core.resolvers import StandardResolver
+
+# Define explicit types for better profiling accuracy
+schema = DeclarativeSchema([
+    StandardResolver(),
+])
+
+observer = WhylogsObserver(schema=schema)
+```
+
+**Reusing Observer:**
+
+```python
+# Reset state before reusing with another runner
+observer.reset()
+runner2 = ValidationRunner(other_data, MyModel)
+runner2.add_observer(observer)
+for result in runner2.run():
+    process(result)
+```
+
+**Key Points:**
+
+- `get_profiles()` and `compare_profiles()` raise `RuntimeError` if called while validation is running
+- Thread-safe for use with parallel validation (`runner.run(workers=4)`)
+- Profiles are accumulated incrementally using whylogs merge for memory efficiency
+- The `chunk_size` parameter controls memory usage vs profiling latency tradeoff
+
 ---
 
 ## SQLModel Integration
@@ -505,6 +710,25 @@ result = ValidationResult(is_valid=True)
 result.add_error("field", "message")  # Sets is_valid=False automatically
 ```
 
+### 7. Writing Example-Based Tests Instead of Property Tests
+
+```python
+# WRONG - Hardcoded examples miss edge cases
+def test_add_error():
+    result = ValidationResult(is_valid=True)
+    result.add_error("email", "Invalid")
+    assert result.is_valid is False
+
+# CORRECT - Property-based test covers all inputs
+from hypothesis import given, strategies as st
+
+@given(st.text(min_size=1), st.text(min_size=1))
+def test_add_error(field: str, message: str):
+    result = ValidationResult(is_valid=True)
+    result.add_error(field, message)
+    assert result.is_valid is False
+```
+
 ---
 
 ## Event Types Reference
@@ -515,9 +739,198 @@ result.add_error("field", "message")  # Sets is_valid=False automatically
 | `CLEANING_ADDED` | ValidationBase | `field`, `original_value`, `new_value`, `reason`, `operation_type` |
 | `VALIDATION_STARTED` | CompositeValidator, ValidationRunner | `model_class`, `validator_name`, `total_hint` |
 | `VALIDATION_COMPLETED` | CompositeValidator, ValidationRunner | `is_valid`, `error_count`, `duration_ms`, `stats` |
-| `ROW_PROCESSED` | ValidationRunner | `row_index`, `is_valid`, `stats_snapshot`, `errors` |
+| `ROW_PROCESSED` | ValidationRunner | `row_index`, `is_valid`, `stats_snapshot`, `errors`, `raw_data`, `model_dict` |
 | `BATCH_STARTED` | ValidationRunner | `batch_number`, `batch_size` |
 | `BATCH_COMPLETED` | ValidationRunner | `batch_number`, `batch_size` |
+
+---
+
+## Testing with Hypothesis
+
+All tests in this repository **must** use [Hypothesis](https://hypothesis.readthedocs.io/) for property-based, stateful, and unit testing. Hypothesis finds edge cases that traditional example-based tests miss.
+
+### Property-Based Testing
+
+Use `@given` to test invariants that should hold for all valid inputs:
+
+```python
+from hypothesis import given, strategies as st
+from abstract_validation_base import ValidationResult
+
+@given(st.text(), st.text())
+def test_add_error_always_sets_invalid(field: str, message: str):
+    """Property: Adding an error always results in is_valid=False."""
+    result = ValidationResult(is_valid=True)
+    result.add_error(field, message)
+    assert result.is_valid is False
+    assert len(result.errors) >= 1
+
+
+@given(st.lists(st.tuples(st.text(min_size=1), st.text(min_size=1)), min_size=1))
+def test_error_count_matches_errors_added(errors: list[tuple[str, str]]):
+    """Property: Error count equals number of errors added."""
+    result = ValidationResult(is_valid=True)
+    for field, message in errors:
+        result.add_error(field, message)
+    assert len(result.errors) == len(errors)
+```
+
+### Stateful Testing
+
+Use `RuleBasedStateMachine` to test complex interactions and state transitions:
+
+```python
+from hypothesis import strategies as st
+from hypothesis.stateful import RuleBasedStateMachine, rule, invariant
+from abstract_validation_base import ValidationBase
+
+class ValidationBaseStateMachine(RuleBasedStateMachine):
+    """Test that ValidationBase maintains consistent state through operations."""
+    
+    def __init__(self):
+        super().__init__()
+        self.model = MyModel(name="test")
+        self.expected_error_count = 0
+        self.expected_cleaning_count = 0
+    
+    @rule(field=st.text(min_size=1), message=st.text(min_size=1))
+    def add_error(self, field: str, message: str):
+        self.model.add_error(field, message)
+        self.expected_error_count += 1
+    
+    @rule(
+        field=st.text(min_size=1),
+        original=st.text(),
+        new=st.text(),
+        reason=st.text(min_size=1)
+    )
+    def add_cleaning(self, field: str, original: str, new: str, reason: str):
+        self.model.add_cleaning_process(field, original, new, reason)
+        self.expected_cleaning_count += 1
+    
+    @invariant()
+    def error_count_consistent(self):
+        assert self.model.error_count == self.expected_error_count
+    
+    @invariant()
+    def cleaning_count_consistent(self):
+        assert self.model.cleaning_count == self.expected_cleaning_count
+    
+    @invariant()
+    def has_errors_reflects_count(self):
+        assert self.model.has_errors == (self.expected_error_count > 0)
+
+
+TestValidationBase = ValidationBaseStateMachine.TestCase
+```
+
+### Unit Testing with Hypothesis
+
+Even simple unit tests benefit from Hypothesis strategies:
+
+```python
+from hypothesis import given, strategies as st, assume
+from abstract_validation_base import CompositeValidator
+
+# Strategy for generating valid model data
+model_data = st.fixed_dictionaries({
+    "name": st.text(min_size=1, max_size=100),
+    "email": st.emails(),
+    "age": st.integers(min_value=0, max_value=150),
+})
+
+@given(model_data)
+def test_composite_validator_runs_all_validators(data: dict):
+    """All validators in composite are executed."""
+    model = MyModel(**data)
+    composite = CompositeValidator[MyModel](
+        validators=[ValidatorA(), ValidatorB()],
+        name="test_composite"
+    )
+    result = composite.validate(model)
+    # Verify both validators contributed to the result
+    assert isinstance(result.is_valid, bool)
+```
+
+### Custom Strategies
+
+Define reusable strategies for domain types:
+
+```python
+from hypothesis import strategies as st
+
+# Strategy for generating ValidationBase models
+@st.composite
+def validation_models(draw, with_errors: bool = False, with_cleaning: bool = False):
+    """Generate MyModel instances with optional errors/cleaning."""
+    model = MyModel(
+        name=draw(st.text(min_size=1)),
+        email=draw(st.emails()),
+    )
+    
+    if with_errors:
+        num_errors = draw(st.integers(min_value=1, max_value=5))
+        for _ in range(num_errors):
+            model.add_error(
+                draw(st.text(min_size=1, max_size=20)),
+                draw(st.text(min_size=1, max_size=100))
+            )
+    
+    if with_cleaning:
+        num_cleaning = draw(st.integers(min_value=1, max_value=5))
+        for _ in range(num_cleaning):
+            model.add_cleaning_process(
+                draw(st.text(min_size=1, max_size=20)),
+                draw(st.text()),
+                draw(st.text()),
+                draw(st.text(min_size=1, max_size=100))
+            )
+    
+    return model
+
+
+@given(validation_models(with_errors=True))
+def test_models_with_errors_report_has_errors(model):
+    assert model.has_errors is True
+```
+
+### Settings and Profiles
+
+Configure Hypothesis appropriately for CI vs local development:
+
+```python
+from hypothesis import settings, Phase
+
+# In conftest.py - register profiles
+settings.register_profile("ci", max_examples=1000, deadline=None)
+settings.register_profile("dev", max_examples=100, deadline=500)
+settings.register_profile("debug", max_examples=10, phases=[Phase.generate])
+
+# Load profile from environment
+import os
+settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "dev"))
+```
+
+### Testing Guidelines
+
+1. **Prefer property-based tests** — They find edge cases you won't think of
+2. **Use stateful tests for stateful components** — ValidationBase, ProcessLog, etc.
+3. **Define custom strategies** in `conftest.py` for reuse across test modules
+4. **Use `@example` decorator** to pin specific regression cases
+5. **Set `deadline=None`** for tests involving I/O or complex operations
+6. **Use `assume()`** to filter invalid combinations rather than complex strategies
+
+### Example Test Structure
+
+```
+tests/
+├── conftest.py           # Shared fixtures and Hypothesis strategies
+├── strategies.py         # Custom Hypothesis strategies (optional)
+├── test_base.py          # Property + stateful tests for ValidationBase
+├── test_validators.py    # Property tests for validator behavior
+├── test_runner.py        # Stateful tests for ValidationRunner
+└── test_writers.py       # Property tests for output writers
+```
 
 ---
 
@@ -640,6 +1053,7 @@ Issues are automatically labeled based on content:
 | CSVFailedWriter, JSONLines, AuditReport | `component:writers` |
 | ValidatedRecord, SQLModel, to_db | `component:sqlmodel` |
 | RichDashboard, SimpleProgress, observer | `component:rich` |
+| WhylogsObserver, ProfilePair, profiling, whylogs | `component:whylogs` |
 
 Bug reports automatically receive a helpful comment with relevant documentation links.
 
@@ -667,7 +1081,7 @@ uv run pytest
 
 1. **Link to related issue** — Reference with `Closes #123`
 2. **Type of change** — Bug fix, feature, docs, refactor, tests
-3. **Tests** — Add tests for new functionality
+3. **Tests** — Add Hypothesis-based tests (property, stateful, or unit) for new functionality
 4. **Documentation** — Update docs/docstrings for user-facing changes
 
 ### CI Checks (Automated)

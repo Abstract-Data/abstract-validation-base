@@ -654,21 +654,28 @@ class ValidationRunner(ObservableMixin, Generic[T]):
         Args:
             result: The RowResult that was just processed.
         """
+        event_data: dict[str, Any] = {
+            "row_index": result.row_index,
+            "is_valid": result.is_valid,
+            "stats_snapshot": {
+                "total": self._stats.total_rows,
+                "valid": self._stats.valid_rows,
+                "failed": self._stats.error_rows,
+                "total_hint": self._total_hint,
+            },
+            "errors": result.error_summary if not result.is_valid else [],
+            "raw_data": result.raw_data,
+        }
+
+        # Add model_dict only for valid records with a model
+        if result.is_valid and result.model is not None:
+            event_data["model_dict"] = result.model.model_dump(mode="python")
+
         self.notify(
             ValidationEvent(
                 event_type=ValidationEventType.ROW_PROCESSED,
                 source=self,
-                data={
-                    "row_index": result.row_index,
-                    "is_valid": result.is_valid,
-                    "stats_snapshot": {
-                        "total": self._stats.total_rows,
-                        "valid": self._stats.valid_rows,
-                        "failed": self._stats.error_rows,
-                        "total_hint": self._total_hint,
-                    },
-                    "errors": result.error_summary if not result.is_valid else [],
-                },
+                data=event_data,
             )
         )
 
